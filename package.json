@@ -1,0 +1,42 @@
+{
+  "name": "training",
+  "version": "1.0.0",
+  "description": "",
+  "main": "app.js",
+  "type": "module",
+  "scripts": {
+    "test": "NODE_ENV=test mocha --recursive --exit --require ./test/fixtures.js",
+    "start": "NODE_ENV=development nodemon ./src/app.js",
+    "migrate:init": "cd ./src/service/knex && knex migrate:up 20231017035624_setupDatabase.js --env development",
+    "migrate:flush": " cd ./src/service/knex && knex migrate:down 20231017035624_setupDatabase.js --env development",
+    "migrate:init:test": "cd ./src/service/knex && knex migrate:up 20231017035624_setupDatabase.js --env test",
+    "migrate:flush:test": "cd ./src/service/knex && knex migrate:down 20231017035624_setupDatabase.js --env test",
+    "seed:dev": "cd ./src/service/knex && knex seed:run --env development",
+    "seed:test": "cd ./src/service/knex && knex seed:run --env test"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "knex": "^3.0.1",
+    "lodash": "^4.17.21",
+    "mysql": "^2.18.1",
+    "nodemon": "^3.0.1",
+    "path": "^0.12.7",
+    "redis": "^4.6.10",
+    "sinon": "^16.1.0",
+    "url": "^0.11.3",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/uuid": "^9.0.6",
+    "chai": "^4.3.10",
+    "chai-as-promised": "^7.1.1",
+    "mocha": "^10.2.0",
+    "nyc": "^15.1.0",
+    "supertest": "^6.3.3"
+  }
+}
