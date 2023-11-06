@@ -1,6 +1,6 @@
 import knex from '../knex/index.js';
 import BaseService, { beginTransaction } from './index.js';
-import config from '../../config.js';
+import ProductFilterQueryBuilder from './filter-query-builder/product.builder.js';
 
 export const schema = {
   id: 'number',
@@ -18,40 +18,14 @@ export class ProductService extends BaseService {
     super(table);
   }
 
-  setupSchema(table) {
-    table.increments('id').primary();
-    table.string('name', 40).notNullable();
-    table.double('price', 10, 6).notNullable();
-    table.integer('sold').notNullable().defaultTo(0);
-    table.integer('stock').notNullable().defaultTo(0);
-    table.timestamp('created_at', { precision: 0 }).defaultTo(knex.fn.now(0));
-    table
-      .timestamp('updated_at', { precision: 0 })
-      .defaultTo(knex.raw('CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP'));
-    table.string('remark', 200);
-  }
-
-  async addProductToDB(product) {
-    return beginTransaction(async (trx) => {
-      const id = await this.create(product, trx);
-      const addedProduct = await this.readById(id, '*', trx);
-
-      return addedProduct;
-    });
-  }
-
   async getProductsFromDB(filter, options) {
-    const { price, priceComparison, sortBy, order, limit, page } = options;
+    const productFilterQueryBuilder = new ProductFilterQueryBuilder(filter);
 
-    return this.#readAll(
-      filter,
-      price,
-      priceComparison,
-      sortBy,
-      order,
-      limit,
-      page
-    );
+    const [totalPage, products] = await productFilterQueryBuilder
+      .priceFilter()
+      .execute(options);
+
+    return [totalPage, products];
   }
 
   async getSingleProductFromDB(id) {
@@ -71,20 +45,6 @@ export class ProductService extends BaseService {
 
   async removeProductFromDB(id) {
     return this.deleteById(id);
-  }
-
-  async removeProductsFromDB(ids) {
-    return this.deleteByIds(ids);
-  }
-
-  async #readAll(filter, price, priceComparison, sortBy, order, limit, page) {
-    return knex(this.table)
-      .where(filter)
-      .andWhere('price', priceComparison, price)
-      .orderBy(sortBy, order)
-      .select()
-      .limit(limit)
-      .offset((page - 1) * limit);
   }
 }
 

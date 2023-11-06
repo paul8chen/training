@@ -11,13 +11,12 @@ class ProductController {
   async addProduct(req, res) {
     const newProduct = req.body;
     const { name, price } = newProduct;
-
     if (!name || !price) throw new BadRequestError('Incomplete product');
 
-    const addedProduct = await productService.addProductToDB(newProduct);
-    const { id: cacheId } = addedProduct;
+    const addedProduct = await productService.addToDB(newProduct);
+    if (!addedProduct) throw new ServerError('Add Product to DB failed');
 
-    await productCache.addSingleProductToCache(cacheId, addedProduct);
+    await productCache.updateCacheRenewedAt(+new Date());
 
     res.status(201).json({
       status: 'success',
@@ -28,41 +27,54 @@ class ProductController {
   async getProducts(req, res) {
     const { name, price, priceComparison, sortBy, page, limit, order } =
       req.query;
-
-    const filter = name ? { name } : {};
+    console.log(req.query);
+    const filter = {};
+    if (name) filter.name = name;
+    if (price && priceComparison) {
+      filter.price = +price;
+      filter.priceComparison = priceComparison;
+    }
     const options = {
-      price: +price || 0,
-      priceComparison: priceComparison || '>',
       sortBy: sortBy || 'updated_at',
       page,
       limit,
       order,
     };
 
-    const cacheRenewedAt = productCache.renewedAt;
-    const cacheId = getQueryCacheId(options, cacheRenewedAt);
+    // const cacheRenewedAt = await productCache.getCacheRenewedAt();
+    const cacheRenewedAt = +new Date();
+    const cacheId = getQueryCacheId({ ...filter, ...options, cacheRenewedAt });
 
-    let products;
+    let totalPage, products;
 
-    products = await productCache.getProductsFromCache(cacheId);
-    if (products)
-      return res.status(200).json({ status: 'success', data: { products } });
+    [totalPage, products] = await productCache.getDataFromCache(cacheId);
 
-    products = await productService.getProductsFromDB(filter, options);
+    if (products.length)
+      return res
+        .status(200)
+        .json({ status: 'success', data: { totalPage, products } });
+
+    [totalPage, products] = await productService.getProductsFromDB(
+      filter,
+      options
+    );
+
     if (!products.length) {
       await productCache.releaseLock(cacheId);
-      res.status(200).json({ status: 'success', data: { products: [] } });
+      res
+        .status(200)
+        .json({ status: 'success', data: { totalPage: 1, products: [] } });
       return;
     }
 
-    const isProductsCached = await productCache.addProductsToCache(
-      cacheId,
-      products
-    );
+    const isProductsCached = await productCache.addDataToCache(cacheId, [
+      totalPage,
+      products,
+    ]);
     if (!isProductsCached)
       throw new ServerError('Add Products to cache failed');
 
-    res.status(200).json({ status: 'success', data: { products } });
+    res.status(200).json({ status: 'success', data: { totalPage, products } });
   }
 
   async getSingleProduct(req, res) {
@@ -93,13 +105,10 @@ class ProductController {
     const { id } = req.params;
     const newerProduct = req.body;
 
-    const updatedProduct = await productService.updateProductInDB(
-      id,
-      newerProduct
-    );
+    const updatedProduct = await productService.updateInDB(id, newerProduct);
     if (!updatedProduct) throw new BadRequestError('Product id not exist');
 
-    await productCache.updateProductInCache(id, updatedProduct);
+    await productCache.updateCacheRenewedAt(+new Date());
 
     res.status(200).json({ status: 'success', data: { updatedProduct } });
   }
@@ -107,11 +116,10 @@ class ProductController {
   async removeProduct(req, res) {
     const { id } = req.params;
 
-    const isRemoved = await productService.removeProductFromDB(id);
+    const isRemoved = await productService.removeFromDB(id);
     if (!isRemoved) throw new BadRequestError('Product id not exist');
 
-    const cacheId = `Product:${id}`;
-    await productCache.removeProductFromCache(cacheId);
+    await productCache.updateCacheRenewedAt(+new Date());
 
     res.sendStatus(204);
   }
@@ -125,11 +133,10 @@ class ProductController {
         throw new BadRequestError('Invalid product id');
     }
 
-    const isRemoved = await productService.removeProductsFromDB(ids);
+    const isRemoved = await productService.removeFromDB(ids);
     if (!isRemoved) throw new BadRequestError('Product id not exist');
 
-    const cacheIds = ids.map((id) => `Product:${id}`);
-    await productCache.removeProductFromCache(cacheIds);
+    await productCache.updateCacheRenewedAt(+new Date());
 
     res.sendStatus(204);
   }

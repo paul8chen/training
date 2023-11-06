@@ -16,14 +16,16 @@ class Config {
   MYSQL_DATABASE_TEST = process.env.MYSQL_DATABASE_TEST || '';
   MYSQL_CHARSET = process.env.MYSQL_CHARSET || 'utf8mb4';
   MYSQL_TIMEZONE = process.env.MYSQL_TIMEZONE || '+08:00';
+  TIMEZONE_OFFSET = +process.env.TIMEZONE_OFFSET || 8;
   REDIS_HOST = process.env.REDIS_HOST || '';
   REDIS_PORT = process.env.REDIS_PORT || '';
-  BASE_ITEMS_PER_PAGE = process.env.ITEMS_PER_PAGE || 20;
+  BASE_ITEMS_PER_PAGE = process.env.ITEMS_PER_PAGE || 5;
   BASE_PAGE = process.env.BASE_PAGE || 1;
   BASE_ORDER = process.env.BASE_ORDER || 'desc';
   UUID_NAMESPACE = process.env.UUID_NAMESPACE || '';
   REDIS_RETRY_DELAY_TIME_S = process.env.REDIS_RETRY_DELAY_TIME_S || 1;
   REDIS_LOCK_EXPIRY_TIME_S = process.env.REDIS_LOCK_EXPIRY_TIME_S || 5;
+  REDIS_CACHE_EXPIRY_TIME_S = process.env.REDIS_CACHE_EXPIRY_TIME_S || 300;
 
   validateConfig() {
     for (const [key, val] of Object.entries(this)) {

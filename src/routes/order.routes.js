@@ -1,7 +1,7 @@
 import express from 'express';
 
 import orderControllers from '../controllers/order.controllers.js';
-import { schema, status } from '../service/mysql/order.service.js';
+import { schema, STATUS as status } from '../service/mysql/order.service.js';
 import { asyncErrorHandler } from '../helpers/error-handler.js';
 import { validateQuery, setupReadAllQuery } from '../helpers/middleware.js';
 
@@ -10,6 +10,9 @@ const { controllerName, getOrders, addOrder, updateOrderStatus } =
 
 const validReadOrdersQuerys = {
   buyer: 'PASS',
+  product: 'PASS',
+  createdAt: 'TIMESTAMP',
+  createdAtComparison: 'COMPARISON',
   status: 'STATUS',
   sortBy: 'SCHEMA',
   quantity: 'NUMBER',

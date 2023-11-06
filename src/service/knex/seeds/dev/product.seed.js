@@ -27,6 +27,69 @@ export const seed = async function (knex) {
       sold: 5,
       stock: 10,
     },
+    {
+      name: 'YOW MEADOW 26',
+      price: 330,
+      remark: 'surfskate for surfing on the land',
+      sold: 3,
+      stock: 10,
+    },
+    {
+      name: 'yow kontiki 39',
+      price: 300,
+      remark: 'surfskate for surfing on the land',
+      sold: 0,
+      stock: 10,
+    },
+    {
+      name: 'YOW X PUKAS FLAME 31 DECK',
+      price: 290,
+      remark: 'surfskate for surfing on the land',
+      sold: 5,
+      stock: 10,
+    },
+    {
+      name: 'YOW MEADOW 25',
+      price: 330,
+      remark: 'surfskate for surfing on the land',
+      sold: 3,
+      stock: 10,
+    },
+    {
+      name: 'yow kontiki 43',
+      price: 300,
+      remark: 'surfskate for surfing on the land',
+      sold: 0,
+      stock: 10,
+    },
+    {
+      name: 'YOW X PUKAS FLAME 28 DECK',
+      price: 290,
+      remark: 'surfskate for surfing on the land',
+      sold: 5,
+      stock: 10,
+    },
+    {
+      name: 'YOW MEADOW 21',
+      price: 330,
+      remark: 'surfskate for surfing on the land',
+      sold: 3,
+      stock: 10,
+    },
+    {
+      name: 'yow kontiki 42',
+      price: 300,
+      remark: 'surfskate for surfing on the land',
+      sold: 0,
+      stock: 10,
+    },
+    {
+      name: 'YOW X PUKAS FLAME 26 DECK',
+      price: 290,
+      remark: 'surfskate for surfing on the land',
+      sold: 5,
+      stock: 10,
+    },
   ]);
 
   await knex('Purchase').del();
@@ -43,6 +106,51 @@ export const seed = async function (knex) {
     },
     {
       product_id: 3,
+      price: 260,
+      quantity: 10,
+    },
+    {
+      product_id: 4,
+      price: 300,
+      quantity: 10,
+    },
+    {
+      product_id: 5,
+      price: 270,
+      quantity: 10,
+    },
+    {
+      product_id: 6,
+      price: 260,
+      quantity: 10,
+    },
+    {
+      product_id: 7,
+      price: 300,
+      quantity: 10,
+    },
+    {
+      product_id: 8,
+      price: 270,
+      quantity: 10,
+    },
+    {
+      product_id: 9,
+      price: 260,
+      quantity: 10,
+    },
+    {
+      product_id: 10,
+      price: 300,
+      quantity: 10,
+    },
+    {
+      product_id: 11,
+      price: 270,
+      quantity: 10,
+    },
+    {
+      product_id: 12,
       price: 260,
       quantity: 10,
     },

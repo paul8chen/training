@@ -1,4 +1,5 @@
 import { BadRequestError } from './error-handler.js';
+import { getTransFormedTZDate } from './utils.js';
 import config from '../config.js';
 
 export const validateBody = function (controllerName, schema) {
@@ -39,6 +40,12 @@ export const validateQuery = function (controllerName, validQuerys, options) {
         case 'STATUS':
           if (statusValidator(val, status)) continue;
           break;
+        case 'TIMESTAMP':
+          if (timestampValidator(val)) {
+            req.query[query] = getTransFormedTZDate(val);
+            continue;
+          }
+          break;
       }
 
       throw new BadRequestError(`Invalid ${controllerName} query parameter`);
@@ -59,7 +66,7 @@ function numberValidator(val) {
   return !isNaN(val);
 }
 function comparisonValidator(val) {
-  return ['>', '<'].includes(val);
+  return ['>', '<', '='].includes(val);
 }
 function orderValidator(val) {
   return ['asc', 'desc'].includes(val);
@@ -67,6 +74,9 @@ function orderValidator(val) {
 function schemaValidator(val, schema) {
   return schema[val];
 }
-function statusValidator(val, status) {
-  return status.includes(val);
+function statusValidator(vals, status) {
+  return vals.every((val) => status.includes(val));
+}
+function timestampValidator(val) {
+  return new Date(val).getTime() > 0;
 }

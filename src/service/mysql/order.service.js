@@ -1,10 +1,8 @@
 import lodash from 'lodash';
 
-import knex from '../knex/index.js';
 import BaseService, { beginTransaction } from './index.js';
-import productService from './product.service.js';
-import orderDetailService from './orderDetail.service.js';
 import { BadRequestError } from '../../helpers/error-handler.js';
+import OrderFilterQueryBuilder from './filter-query-builder/order.builder.js';
 
 export const schema = {
   id: 'number',
@@ -14,7 +12,7 @@ export const schema = {
   created_at: 'string',
 };
 
-export const status = [
+export const STATUS = [
   'PENDING',
   'ORDER CONFIRMED',
   'SHIPPED',
@@ -27,130 +25,76 @@ export class OrderService extends BaseService {
     super(table);
   }
 
-  setupSchema(table) {
-    table.increments('id').primary();
-    table.string('buyer', 40).notNullable();
-    table.string('status', 20).defaultTo('PENDING');
-    table.double('amount', 10, 6).notNullable();
-    table.timestamp('created_at', { precision: 0 }).defaultTo(knex.fn.now(0));
-  }
+  async addOrderToDB(buyer, orderDetails) {
+    const ids = orderDetails.map((el) => el.product_id);
 
-  async addOrderAndOrderDetailsToDB(order, orderDetails) {
-    const serializedOrder = await beginTransaction(async (trx) => {
-      await this.#calOrderAmountAndUpdateProduct(order, orderDetails, trx);
+    const addedId = await beginTransaction(async (trx) => {
+      const productInfos = await trx('Product')
+        .select('id', 'price', 'stock')
+        .whereIn('id', ids)
+        .forUpdate();
 
-      const orderId = await this.create(order, trx);
+      let amount = 0;
+      for (const productInfo of productInfos) {
+        const { id, price, stock } = productInfo;
+        const orderDetail = orderDetails.find(
+          (el) => el.product_id === `${id}`
+        );
 
-      orderDetails.forEach((orderDetail) => (orderDetail.order_id = orderId));
-      await orderDetailService.create(orderDetails, trx);
+        const quantity = +orderDetail.quantity;
 
-      const addedOrder = await this.#readById(orderId, trx);
-      return addedOrder;
+        if (quantity > stock)
+          throw new BadRequestError(`No enough stock for product_id ${id}`);
+
+        orderDetail.price = price;
+        amount += quantity * price;
+        await trx('Product')
+          .where('id', id)
+          .increment({ sold: quantity, stock: -quantity });
+      }
+
+      const addedIds = await trx('Order').insert({ buyer, amount });
+      orderDetails.forEach((el) => {
+        el.order_id = addedIds[0];
+      });
+      console.log(orderDetails);
+      await trx('OrderDetail').insert(orderDetails);
+
+      return addedIds[0];
     });
 
-    const addedOrders = this.#deserializeOrders(serializedOrder);
-    return addedOrders[0];
+    if (!addedId) throw new BadRequestError(`Add order failed`);
+
+    const orderFilterQueryBuilder = new OrderFilterQueryBuilder({
+      id: addedId,
+    });
+
+    const [_, serializedOrders] = await orderFilterQueryBuilder.execute();
+    const orders = this.#deserializeOrders(serializedOrders);
+
+    return orders[0];
   }
 
   async getOrdersFromDB(filter, options) {
-    const { sortBy, order, limit, page } = options;
-    const serializedOrders = await this.#readAll(
-      filter,
-      sortBy,
-      order,
-      limit,
-      page
-    );
+    const orderFilterQueryBuilder = new OrderFilterQueryBuilder(filter);
+
+    const [totalPage, serializedOrders] = await orderFilterQueryBuilder
+      .createdAtFilter()
+      .statusFilter()
+      .productFilter()
+      .execute(options);
 
     const orders = this.#deserializeOrders(serializedOrders);
-    return orders;
+
+    return [totalPage, orders];
   }
 
   async updateOrderStatusInDB(id, status) {
-    return beginTransaction(async (trx) => {
-      const isIdExist = await this.updateById(id, { status });
-      if (!isIdExist) return;
+    const isIdExist = await this.updateById(id, { status });
+    if (!isIdExist) return;
 
-      const updatedProduct = await this.readById(id, '*');
-      return updatedProduct;
-    });
-  }
-
-  async #readById(id, trx) {
-    return trx(this.table)
-      .innerJoin('OrderDetail', `${this.table}.id`, 'OrderDetail.order_id')
-      .innerJoin('Product', 'OrderDetail.product_id', 'Product.id')
-      .where({ 'Order.id': id })
-      .select(
-        'Order.id',
-        'buyer',
-        'status',
-        'amount',
-        'Order.created_at',
-        'product_id',
-        'quantity',
-        'OrderDetail.price',
-        'name'
-      );
-  }
-
-  async #readAll(filter, sortBy, order, limit, page) {
-    return knex(this.table)
-      .innerJoin('OrderDetail', `${this.table}.id`, 'OrderDetail.order_id')
-      .innerJoin('Product', 'OrderDetail.product_id', 'Product.id')
-      .where(filter)
-      .orderBy(sortBy, order)
-      .select(
-        'Order.id',
-        'buyer',
-        'status',
-        'amount',
-        'Order.created_at',
-        'product_id',
-        'quantity',
-        'OrderDetail.price',
-        'name'
-      )
-      .limit(limit)
-      .offset((page - 1) * limit);
-  }
-
-  async #calOrderAmountAndUpdateProduct(order, orderDetails, trx) {
-    const ids = orderDetails.map(({ product_id }) => product_id);
-    const productInfos = await productService.readByIdsLock(
-      ids,
-      ['price', 'stock'],
-      trx,
-      'exclusive'
-    );
-
-    for (const [index, orderDetail] of Object.entries(orderDetails)) {
-      const { product_id, quantity } = orderDetail;
-      const { stock, price } = productInfos[index];
-
-      if (quantity > stock)
-        throw new BadRequestError(
-          `No enough stock for product_id ${product_id}`
-        );
-
-      orderDetail.price = price;
-      order.amount += price * quantity;
-
-      const increaseProductSold = productService.increaseItem(
-        { id: product_id },
-        'sold',
-        quantity,
-        trx
-      );
-      const decreaseProductStock = productService.increaseItem(
-        { id: product_id },
-        'stock',
-        -quantity,
-        trx
-      );
-
-      await Promise.all([increaseProductSold, decreaseProductStock]);
-    }
+    const updatedProduct = await this.readById(id, '*');
+    return updatedProduct;
   }
 
   #deserializeOrders(serializedOrders) {

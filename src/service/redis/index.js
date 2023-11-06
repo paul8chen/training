@@ -5,17 +5,53 @@ import config from '../../config.js';
 export default class BaseCache {
   constructor(cacheName) {
     this.cacheName = cacheName;
-    this.renewedAt = +new Date();
   }
 
-  async createString(id, value, expiry, multi) {
+  async addDataToCache(
+    cacheId,
+    data,
+    expiry = config.REDIS_CACHE_EXPIRY_TIME_S
+  ) {
+    const stringifyData = JSON.stringify(data);
+
+    const [isDataCached, _] = await beginTransaction((multi) => {
+      multi.set(`${this.cacheName}:${cacheId}`, stringifyData, {
+        EX: expiry,
+      });
+
+      this.releaseLock(cacheId, multi);
+    });
+
+    return isDataCached;
+  }
+
+  async getDataFromCache(cacheId) {
+    await this.waitLockReleased(cacheId);
+
+    const serializedData = await redisClient.get(
+      `${this.cacheName}:${cacheId}`
+    );
+    if (!serializedData) {
+      const isLockAcquired = await this.acquireLock(cacheId);
+      return isLockAcquired ? [1, []] : this.getDataFromCache(cacheId);
+    }
+
+    return JSON.parse(serializedData);
+  }
+
+  async updateCacheRenewedAt(time, multi) {
     return multi
-      ? multi.set(`${this.cacheName}:${id}`, value, { EX: expiry })
-      : redisClient.set(`${this.cacheName}:${id}`, value, { EX: expiry });
+      ? multi.set(`renewedAt:${this.cacheName}`, `${time}`)
+      : redisClient.set(`renewedAt:${this.cacheName}`, `${time}`);
   }
 
-  async readString(id) {
-    return redisClient.get(`${this.cacheName}:${id}`);
+  async getCacheRenewedAt() {
+    let cacheRenewedAt = await redisClient.get(`renewedAt:${this.cacheName}`);
+    if (cacheRenewedAt) return cacheRenewedAt;
+
+    cacheRenewedAt = +new Date();
+    await this.updateCacheRenewedAt(cacheRenewedAt);
+    return cacheRenewedAt;
   }
 
   async upsertHash(id, value, multi) {

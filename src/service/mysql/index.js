@@ -5,19 +5,23 @@ export default class BaseService {
     this.table = table;
   }
 
-  async createTable() {
-    const isTableExist = await knex.schema.hasTable(this.table);
-    if (isTableExist) return;
+  async addToDB(data) {
+    const ids = await knex(this.table).insert(data);
+    const id = ids[0];
+    if (!id) return;
 
-    await knex.schema.createTable(this.table, this.setupSchema);
-    console.log(`*** ${this.table} has been created successfully. ***`);
+    return knex(this.table).select('*').where({ id });
   }
 
-  async dropTable() {
-    const isTableExist = await knex.schema.hasTable(this.table);
-    if (!isTableExist) return;
+  async updateInDB(id, data) {
+    const isIdExist = await knex(this.table).where({ id }).update(data);
+    if (!isIdExist) return;
 
-    await knex.schema.dropTable(this.table);
+    return knex(this.table).select('*').where({ id });
+  }
+
+  async removeFromDB(ids) {
+    return knex(this.table).whereIn('id', ids).del();
   }
 
   async create(data, trx = false) {
@@ -26,15 +30,6 @@ export default class BaseService {
       : await knex(this.table).insert(data);
 
     return ids[0];
-  }
-
-  async readAll(filter, sortBy, order, limit, page) {
-    return knex(this.table)
-      .where(filter)
-      .orderBy(sortBy, order)
-      .select()
-      .limit(limit)
-      .offset((page - 1) * limit);
   }
 
   async readById(id, cols, trx) {
@@ -77,10 +72,6 @@ export default class BaseService {
 
   async deleteById(id) {
     return knex(this.table).where({ id }).del();
-  }
-
-  async deleteByIds(ids) {
-    return knex(this.table).whereIn('id', ids).del();
   }
 
   async increaseItem(filter, item, inc, trx) {

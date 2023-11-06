@@ -14,19 +14,6 @@ export class PurchaseService extends BaseService {
     super(table);
   }
 
-  setupSchema(table) {
-    table.increments('id').primary();
-    table
-      .integer('product_id')
-      .unsigned()
-      .notNullable()
-      .references('Product.id')
-      .onDelete('CASCADE');
-    table.integer('quantity').notNullable();
-    table.double('price', 10, 6).notNullable();
-    table.timestamp('created_at', { precision: 0 }).defaultTo(knex.fn.now(0));
-  }
-
   async addPurchaseToDB(purchase) {
     console.log('CALLED');
     const { product_id, quantity } = purchase;
